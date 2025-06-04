@@ -93,27 +93,78 @@ class YouTubeScraper:
         return view_count / subscriber_count
     
     def check_personal_branding(self, channel_data, videos):
-        """属人性の判定（ルールベース）"""
+        """属人性の判定（ルールベース）- 属人性が低い場合True、高い場合Falseを返す"""
+        reasons = []
+        score = 0
+        
+        # 拡張した個人キーワードリスト
         personal_keywords = [
-            'face', 'selfie', 'vlog', 'my', '私', 'me', 'personal',
-            'daily', 'routine', 'life', 'grwm', 'day in my life'
+            'face', 'selfie', 'man', 'woman', 'boy', 'girl', 'host', 'actor', 
+            'vlog', 'interview', 'my', 'me', 'personal', 'daily', 'routine', 
+            'life', 'grwm', 'day in my life', '私', '僕', '俺', '自分', 
+            'わたし', 'ぼく', 'おれ'
         ]
         
-        # チャンネル名とdescriptionをチェック
-        channel_text = (channel_data['title'] + ' ' + channel_data['description']).lower()
+        channel_title = channel_data['title']
+        channel_description = channel_data.get('description', '')
         
-        # サムネイルURLをチェック（顔出しを示唆するキーワード）
-        thumbnail_text = json.dumps(channel_data['thumbnails']).lower()
+        # チャンネル名パターンチェック
+        if any(pattern in channel_title for pattern in ['の部屋', 'チャンネル', 'TV', 'ch', 'Ch', 'CH']):
+            score += 3
+            reasons.append("チャンネル名に人名パターン")
+        
+        # チャンネル名とdescriptionをチェック
+        channel_text = (channel_title + ' ' + channel_description).lower()
+        
+        # 個人キーワードチェック
+        found_keywords = []
+        for keyword in personal_keywords:
+            if keyword in channel_text:
+                score += 2
+                found_keywords.append(keyword)
+        
+        if found_keywords:
+            reasons.append(f"キーワード検出: {', '.join(found_keywords[:3])}")
+        
+        # 説明文の一人称チェック（日本語）
+        first_person_count = sum(1 for word in ['私', '僕', '俺', '自分', 'わたし', 'ぼく', 'おれ'] 
+                                if word in channel_description)
+        if first_person_count >= 3:
+            score += 3
+            reasons.append("一人称が頻出")
+        elif first_person_count >= 1:
+            score += 1
+            reasons.append("一人称を含む")
         
         # 動画タイトルをチェック
         video_titles = ' '.join([video['title'].lower() for video in videos[:10]])
+        video_keywords_found = []
+        for keyword in personal_keywords:
+            if keyword in video_titles:
+                score += 1
+                video_keywords_found.append(keyword)
         
-        all_text = channel_text + ' ' + thumbnail_text + ' ' + video_titles
+        if video_keywords_found:
+            reasons.append(f"動画タイトルに: {', '.join(set(video_keywords_found[:3]))}")
         
-        personal_score = sum(1 for keyword in personal_keywords if keyword in all_text)
+        # サムネイルに人物が含まれている動画の割合をチェック（タイトルから推測）
+        human_thumbnail_keywords = ['face', 'selfie', '顔', 'vlog', 'reaction', 'リアクション']
+        videos_with_humans = sum(1 for v in videos[:10] 
+                               if any(kw in v['title'].lower() for kw in human_thumbnail_keywords))
         
-        # スコアが3以上なら属人性が高いと判定
-        return personal_score < 3
+        if videos_with_humans >= 8:  # 80%以上
+            score += 3
+            reasons.append("全動画に人物サムネイル推定")
+        elif videos_with_humans >= 5:  # 50%以上
+            score += 1
+            reasons.append("半数以上に人物サムネイル推定")
+        
+        # 判定理由を保存
+        channel_data['personal_branding_score'] = min(score, 10)
+        channel_data['personal_branding_reasons'] = ' + '.join(reasons) if reasons else "属人性なし"
+        
+        # スコアが3以上なら属人性が高いと判定（Falseを返す）
+        return score < 3
     
     def filter_channel(self, channel_data, videos):
         """チャンネルをフィルタリング"""
@@ -145,12 +196,13 @@ class YouTubeScraper:
             return False
             
         # 条件5: 属人性が低い
-        if not self.check_personal_branding(channel_data, videos):
+        is_low_personal = self.check_personal_branding(channel_data, videos)
+        if not is_low_personal:
             return False
             
         # フィルタを通過したチャンネルデータを保存
         channel_data['high_diffusion_videos'] = high_diffusion_videos[:3]
-        channel_data['is_personal'] = False
+        channel_data['is_personal'] = channel_data['personal_branding_score'] >= 3
         
         return True
     

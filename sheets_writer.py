@@ -53,14 +53,15 @@ class SheetsWriter:
             '拡散率3',
             '検索キーワード',
             '属人性判定',
+            '判定理由',
             '更新日時'
         ]
         
         # 最初の行にヘッダーを設定
-        worksheet.update('A1:N1', [headers])
+        worksheet.update('A1:O1', [headers])
         
         # ヘッダー行を太字にする
-        worksheet.format('A1:N1', {'textFormat': {'bold': True}})
+        worksheet.format('A1:O1', {'textFormat': {'bold': True}})
         
         return worksheet
     
@@ -106,7 +107,8 @@ class SheetsWriter:
             # その他の情報を追加
             row.extend([
                 channel['search_keyword'],
-                '低' if channel.get('is_personal', False) == False else '高',
+                '属人性あり' if channel.get('is_personal', False) else '属人性なし',
+                channel.get('personal_branding_reasons', ''),
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ])
             
