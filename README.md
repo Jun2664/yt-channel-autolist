@@ -51,9 +51,18 @@ pip install -r requirements.txt
 3. YouTube Data API v3を有効化
 4. 認証情報を作成し、APIキーを取得
 
-### 4. Google Sheets APIの設定
+### 4. Google Sheets & Drive APIの設定
 
-1. 同じGoogle Cloudプロジェクトで Google Sheets API を有効化
+1. Google Cloudプロジェクトで以下のAPIを有効化:
+   - Google Sheets API
+   - **Google Drive API** (重要: これを有効化しないとエラーが発生します)
+   
+   有効化手順:
+   - [Google Cloud Console](https://console.cloud.google.com/)にアクセス
+   - 「APIとサービス」→「ライブラリ」
+   - "Google Sheets API"を検索して有効化
+   - "Google Drive API"を検索して有効化
+   
 2. サービスアカウントを作成:
    - 「認証情報」→「認証情報を作成」→「サービスアカウント」
    - サービスアカウント名とIDを入力
@@ -271,13 +280,28 @@ personal_keywords = [
    - `GOOGLE_SERVICE_ACCOUNT_JSON`が正しいJSON形式か確認
    - サービスアカウントにGoogle Sheets APIへのアクセス権限があるか確認
 
-3. **キーワードファイルエラー**
+3. **Google Drive API無効化エラー**
+   ```
+   Error: Google Drive API has not been used in project XXX before or it is disabled
+   ```
+   - Google Cloud ConsoleでDrive APIを有効化してください
+   - 有効化URL: https://console.cloud.google.com/apis/library/drive.googleapis.com
+   - 有効化後、数分待ってから再実行してください
+
+4. **プレイリストが見つからないエラー**
+   ```
+   Error: playlistNotFound (404)
+   ```
+   - チャンネルがアップロード動画を非公開にしている可能性があります
+   - このエラーは自動的にスキップされ、処理は継続されます
+
+5. **キーワードファイルエラー**
    ```
    Error: keywords.txt not found
    ```
    - `keywords.txt`がプロジェクトルートに存在するか確認
 
-4. **API制限エラー**
+6. **API制限エラー**
    ```
    Error: Quota exceeded
    ```

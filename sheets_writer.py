@@ -1,25 +1,29 @@
 import json
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.errors import HttpError
 from datetime import datetime
 
 class SheetsWriter:
     def __init__(self, service_account_json):
         """Google Sheets APIの初期化"""
-        # サービスアカウントの認証情報をJSONから読み込む
-        creds_dict = json.loads(service_account_json)
-        
-        # 必要なスコープを定義
-        scope = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
-        ]
-        
-        # 認証情報を作成
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        
-        # gspreadクライアントを初期化
-        self.client = gspread.authorize(creds)
+        try:
+            # サービスアカウントの認証情報をJSONから読み込む
+            creds_dict = json.loads(service_account_json)
+            
+            # 必要なスコープを定義
+            scope = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            
+            # 認証情報を作成
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+            
+            # gspreadクライアントを初期化
+            self.client = gspread.authorize(creds)
+        except Exception as e:
+            raise Exception(f"Failed to initialize Google Sheets API: {str(e)}")
         
     def create_or_get_spreadsheet(self, spreadsheet_name):
         """スプレッドシートを作成または取得"""
@@ -28,9 +32,23 @@ class SheetsWriter:
             spreadsheet = self.client.open(spreadsheet_name)
             print(f"既存のスプレッドシート '{spreadsheet_name}' を使用します")
         except gspread.SpreadsheetNotFound:
-            # 新しいスプレッドシートを作成
-            spreadsheet = self.client.create(spreadsheet_name)
-            print(f"新しいスプレッドシート '{spreadsheet_name}' を作成しました")
+            try:
+                # 新しいスプレッドシートを作成
+                spreadsheet = self.client.create(spreadsheet_name)
+                print(f"新しいスプレッドシート '{spreadsheet_name}' を作成しました")
+            except Exception as e:
+                # Handle Drive API disabled error
+                if 'SERVICE_DISABLED' in str(e) or '403' in str(e):
+                    raise Exception(
+                        "Google Drive API is not enabled for this project. "
+                        "Please enable it in the Google Cloud Console: "
+                        "https://console.cloud.google.com/apis/library/drive.googleapis.com"
+                    )
+                else:
+                    raise Exception(f"Failed to create spreadsheet: {str(e)}")
+        except Exception as e:
+            if not isinstance(e, gspread.SpreadsheetNotFound):
+                raise Exception(f"Error accessing Google Sheets: {str(e)}")
             
         return spreadsheet
     

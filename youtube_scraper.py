@@ -65,7 +65,9 @@ class YouTubeScraper:
                 channel_ids = [item['id']['channelId'] for item in search_response.get('items', [])]
                 return channel_ids
         except HttpError as e:
-            print(f"Error occurred: {e}")
+            error_content = json.loads(e.content.decode('utf-8'))
+            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
+            print(f"Error searching channels for keyword '{keyword}': {error_reason} - {e}")
             return []
     
     def get_channel_details(self, channel_id: str) -> Optional[Dict]:
@@ -76,7 +78,7 @@ class YouTubeScraper:
                 part='snippet,statistics,contentDetails'
             ).execute()
             
-            if not channel_response['items']:
+            if not channel_response.get('items'):
                 return None
                 
             channel = channel_response['items'][0]
@@ -92,7 +94,9 @@ class YouTubeScraper:
                 'region': self.region
             }
         except HttpError as e:
-            print(f"Error getting channel details: {e}")
+            error_content = json.loads(e.content.decode('utf-8'))
+            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
+            print(f"Error getting channel details for ID {channel_id}: {error_reason} - {e}")
             return None
     
     def get_channel_videos(self, playlist_id: str, max_results: int = 50) -> List[Dict]:
@@ -126,7 +130,15 @@ class YouTubeScraper:
             
             return videos
         except HttpError as e:
-            print(f"Error getting video list: {e}")
+            error_content = json.loads(e.content.decode('utf-8'))
+            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
+            
+            # Handle 404 errors gracefully - playlist not found
+            if e.resp.status == 404 or error_reason == 'playlistNotFound':
+                print(f"Playlist {playlist_id} not found (404) - channel may have no public uploads")
+                return []
+            
+            print(f"Error getting video list for playlist {playlist_id}: {error_reason} - {e}")
             return []
     
     def calculate_diffusion_rate(self, view_count: int, subscriber_count: int) -> float:
