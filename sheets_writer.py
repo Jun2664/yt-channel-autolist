@@ -35,33 +35,35 @@ class SheetsWriter:
         return spreadsheet
     
     def prepare_worksheet(self, spreadsheet):
-        """ワークシートを準備（ヘッダー行を設定）"""
+        """Prepare worksheet with headers"""
         worksheet = spreadsheet.get_worksheet(0)
         
-        # ヘッダー行を設定
+        # Set headers (bilingual support)
         headers = [
-            'チャンネル名',
-            'チャンネルURL',
-            '登録者数',
-            '投稿数',
-            '開設日',
-            'トップ動画1',
-            '拡散率1',
-            'トップ動画2',
-            '拡散率2',
-            'トップ動画3',
-            '拡散率3',
-            '検索キーワード',
-            '属人性判定',
-            '判定理由',
-            '更新日時'
+            'Channel Name',
+            'Channel URL',
+            'Subscribers',
+            'Video Count',
+            'Created Date',
+            'Top Video 1',
+            'Spread Rate 1',
+            'Top Video 2', 
+            'Spread Rate 2',
+            'Top Video 3',
+            'Spread Rate 3',
+            'Search Keyword',
+            'Personal Branding',
+            'Reasons',
+            'Top Keywords',
+            'Region',
+            'Update Time'
         ]
         
-        # 最初の行にヘッダーを設定
-        worksheet.update('A1:O1', [headers])
+        # Set headers in first row
+        worksheet.update('A1:Q1', [headers])
         
-        # ヘッダー行を太字にする
-        worksheet.format('A1:O1', {'textFormat': {'bold': True}})
+        # Make header row bold
+        worksheet.format('A1:Q1', {'textFormat': {'bold': True}})
         
         return worksheet
     
@@ -104,11 +106,13 @@ class SheetsWriter:
             while len(row) < 11:
                 row.extend(['', ''])
             
-            # その他の情報を追加
+            # Add other information
             row.extend([
                 channel['search_keyword'],
-                '属人性あり' if channel.get('is_personal', False) else '属人性なし',
+                'High' if channel.get('is_personal', False) else 'Low',
                 channel.get('personal_branding_reasons', ''),
+                ', '.join(channel.get('top_keywords', [])[:5]) if 'top_keywords' in channel else '',
+                channel.get('region', 'JP'),
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ])
             
