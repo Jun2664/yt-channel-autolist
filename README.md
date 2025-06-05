@@ -1,35 +1,82 @@
-# YouTube Channel Auto-List
+# YouTube Channel Auto-List 🚀
 
-A Python tool that automatically discovers and filters emerging YouTube channels across multiple regions and exports them to Google Sheets, JSON, or CSV.
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Google APIs](https://img.shields.io/badge/API-YouTube%20%7C%20Sheets-red.svg)](https://developers.google.com/apis-explorer)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-## Overview
+> 新興YouTubeチャンネルを自動検出・分析し、ビジネスパートナーシップに適したチャンネルを発見するPythonツール
 
-This tool searches for YouTube channels based on specific keywords and automatically discovers emerging channels with high growth potential. It features region-specific configurations, keyword analysis, and personal branding detection to identify channels suitable for business partnerships.
+## 📋 目次
 
-## Key Features
+- [概要](#-概要)
+- [主要機能](#-主要機能)
+- [動作環境](#-動作環境)
+- [セットアップ](#-セットアップ)
+- [使い方](#-使い方)
+- [開発・テスト](#-開発テスト)
+- [プロジェクト構成](#-プロジェクト構成)
+- [トラブルシューティング](#-トラブルシューティング)
+- [コントリビューション](#-コントリビューション)
+- [ライセンス](#-ライセンス)
 
-- **Multi-Region Support**: Search channels in JP, US, EN, ES, PT, BR markets
-- **Automatic Channel Discovery**: Search YouTube channels based on keywords
-- **Smart Filtering with Region-Specific Thresholds**: 
-  - Subscriber count limits (JP: ≤20k, EN: ≤50k, etc.)
-  - Video count ≤ 30
-  - Channel age within 60 days
-  - Multiple videos with optimal spread rates
-- **Keyword Analysis**: Extract and analyze trending keywords from successful videos
-- **Personal Branding Detection**: Automatically identify personal/vlog channels to prioritize business-suitable channels
-- **Spread Rate Calculation**: Calculate view/subscriber ratio to evaluate viral potential
-- **Multiple Output Formats**: Export to Google Sheets, JSON, or CSV
-- **Batch Processing**: Process multiple keywords continuously
-- **GitHub Actions Integration**: Automated weekly runs with region-specific processing
+## 🎯 概要
 
-## Prerequisites
+YouTube Channel Auto-Listは、キーワードベースでYouTubeチャンネルを検索し、成長ポテンシャルの高い新興チャンネルを自動的に発見するツールです。地域別の閾値設定、キーワード分析、個人ブランディング検出などの高度な機能により、ビジネスパートナーシップに適したチャンネルを効率的に特定します。
 
-- Python 3.6+
-- YouTube Data API v3 API key
-- Google Cloud Service Account JSON credentials (for Sheets export)
-- Required Python libraries (see requirements.txt)
+### ユースケース
 
-## セットアップ
+- **マーケティング担当者**: インフルエンサーマーケティングの候補チャンネル発見
+- **コンテンツクリエイター**: コラボレーション相手の探索
+- **ビジネス開発**: 成長中のニッチチャンネルとのパートナーシップ機会の特定
+- **市場調査**: 特定分野の新興トレンドとクリエイターの把握
+
+## ✨ 主要機能
+
+### 🌍 マルチリージョン対応
+- **対応地域**: JP（日本）、US（米国）、EN（英語圏）、ES（スペイン語圏）、PT（ポルトガル語圏）、BR（ブラジル）
+- 地域別に最適化された検索パラメータと閾値設定
+
+### 🔍 スマートフィルタリング
+- **地域別購読者数上限**: JP ≤20k、EN ≤50k など
+- **動画数**: ≤30本（新興チャンネルに特化）
+- **チャンネル年齢**: 60日以内
+- **拡散率計算**: 視聴回数/購読者数比で viral potential を評価
+
+### 📊 高度な分析機能
+- **キーワード抽出**: 成功動画から頻出キーワードを自動抽出
+- **個人ブランディング検出**: vlog/個人チャンネルを識別し、ビジネス向けチャンネルを優先
+- **トレンドスコアリング**: キーワードの出現頻度と関連性を数値化
+
+### 📤 柔軟な出力形式
+- **Google Sheets**: リアルタイム共有と共同編集に対応
+- **JSON**: プログラマティックな処理やAPI連携用
+- **CSV**: Excel等での詳細分析用
+
+### 🤖 自動化対応
+- **GitHub Actions統合**: 定期的な自動実行設定
+- **バッチ処理**: 複数キーワードの連続処理
+- **環境変数対応**: CI/CD環境での柔軟な設定
+
+## 💻 動作環境
+
+### 必須要件
+
+- **Python**: 3.11 以上
+- **OS**: Linux, macOS, Windows
+- **メモリ**: 512MB 以上推奨
+
+### 必要なAPIとサービス
+
+1. **YouTube Data API v3**
+   - APIキーが必要
+   - デフォルトクォータ: 10,000ユニット/日
+
+2. **Google Sheets API** (Sheets出力を使用する場合)
+   - サービスアカウント認証情報が必要
+   - Google Cloud Projectの設定が必要
+
+## 🛠️ セットアップ
 
 ### 1. リポジトリのクローン
 
@@ -38,35 +85,53 @@ git clone https://github.com/Jun2664/yt-channel-autolist.git
 cd yt-channel-autolist
 ```
 
-### 2. 依存関係のインストール
+### 2. Python仮想環境の作成（推奨）
+
+```bash
+# venvの作成
+python -m venv venv
+
+# 仮想環境の有効化
+# Linux/macOS:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+```
+
+### 3. 依存関係のインストール
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. YouTube Data APIの設定
+### 4. YouTube Data API の設定
 
-1. [Google Cloud Console](https://console.cloud.google.com/)にアクセス
-2. 新しいプロジェクトを作成または既存のプロジェクトを選択
-3. YouTube Data API v3を有効化
-4. 認証情報を作成し、APIキーを取得
+1. [Google Cloud Console](https://console.cloud.google.com/) にアクセス
+2. 新規プロジェクトを作成 or 既存プロジェクトを選択
+3. 「APIとサービス」→「ライブラリ」から **YouTube Data API v3** を検索して有効化
+4. 「認証情報」→「認証情報を作成」→「APIキー」でキーを生成
+5. 必要に応じてAPIキーに制限を設定（推奨）
 
-### 4. Google Sheets APIの設定
+### 5. Google Sheets API の設定（オプション）
 
-1. 同じGoogle Cloudプロジェクトで Google Sheets API を有効化
-2. サービスアカウントを作成:
-   - 「認証情報」→「認証情報を作成」→「サービスアカウント」
-   - サービスアカウント名とIDを入力
-   - 「作成して続行」をクリック
-3. サービスアカウントに「編集者」ロールを付与
-4. JSONキーを作成:
-   - 作成したサービスアカウントをクリック
-   - 「キー」タブ→「鍵を追加」→「新しい鍵を作成」
-   - JSON形式を選択してダウンロード
+Google Sheetsへの出力を使用する場合：
 
-### 5. 環境変数の設定
+1. 同じGoogle Cloud Projectで **Google Sheets API** を有効化
+2. サービスアカウントの作成:
+   ```
+   「認証情報」→「認証情報を作成」→「サービスアカウント」
+   - 名前: yt-channel-autolist-service (任意)
+   - ロール: 編集者
+   ```
+3. JSONキーの生成:
+   ```
+   作成したサービスアカウント → 「キー」タブ → 「鍵を追加」→ 「新しい鍵を作成」→ JSON形式
+   ```
+4. ダウンロードしたJSONファイルを安全に保管
 
-以下の環境変数を設定してください：
+### 6. 環境変数の設定
+
+#### 方法1: 環境変数を直接設定
 
 ```bash
 # YouTube API キー
@@ -76,228 +141,305 @@ export YOUTUBE_API_KEY="your-youtube-api-key-here"
 export GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "...", ...}'
 ```
 
-または、`.env`ファイルを作成して管理することも可能です。
+#### 方法2: .envファイルを使用（推奨）
 
-### 6. キーワードの設定
+プロジェクトルートに `.env` ファイルを作成:
 
-`keywords.txt`ファイルを編集して、検索したいキーワードを1行に1つずつ記載します。デフォルトでは以下のようなキーワードが含まれています：
+```env
+# API Keys
+YOUTUBE_API_KEY=your-youtube-api-key-here
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": "...", ...}'
 
-- チュートリアル関連: "tutorial", "how to", "diy", "guide"
-- 教育系: "programming", "science", "history", "mathematics"
-- スキル系: "video editing", "3d modeling", "game development"
-- ビジネス系: "business", "finance", "marketing", "investing"
+# Optional: Default region
+DEFAULT_REGION=JP
+```
 
-## Usage
+### 7. キーワードファイルの準備
 
-### Basic Usage (Japanese Market)
+`keywords.txt` を編集し、検索キーワードを1行に1つずつ記載:
+
+```text
+tutorial
+how to
+programming
+machine learning
+```
+
+## 📖 使い方
+
+### 基本的な使用方法
 
 ```bash
+# 日本市場のチャンネルを検索（デフォルト）
 python main.py
+
+# 米国市場のチャンネルを検索
+python main.py --region US
+
+# カスタムキーワードファイルを使用
+python main.py --keywords-file custom_keywords.txt
 ```
 
-### Search English Market Channels
+### コマンドライン引数
+
+| 引数 | 説明 | デフォルト | 選択肢 |
+|------|------|------------|--------|
+| `--region` | 対象地域 | JP | JP, US, EN, ES, PT, BR |
+| `--lang` | 言語コード | 地域から自動検出 | 任意の言語コード |
+| `--keywords-file` | キーワードファイルパス | keywords.txt | 任意のファイルパス |
+| `--output-format` | 出力形式 | sheets | sheets, json, csv |
+
+### 使用例
 
 ```bash
-python main.py --region US --lang en
+# スペイン語圏のチャンネルをJSON形式で出力
+python main.py --region ES --output-format json
+
+# ブラジル市場をカスタムキーワードでCSV出力
+python main.py --region BR --keywords-file keywords_br.txt --output-format csv
+
+# 英語圏チャンネルをGoogle Sheetsに出力（デフォルト）
+python main.py --region EN
 ```
 
-### Export to Different Formats
+### GitHub Actions での自動実行
 
-```bash
-# Export to JSON
-python main.py --region EN --output-format json
-
-# Export to CSV
-python main.py --region ES --output-format csv
-
-# Use custom keywords file
-python main.py --region PT --keywords-file keywords_pt.txt
-```
-
-### Region Options
-
-- `JP` - Japan (default)
-- `US` - United States
-- `EN` - English-speaking markets
-- `ES` - Spanish-speaking markets
-- `PT` - Portuguese-speaking markets
-- `BR` - Brazil
-
-The tool will:
-
-1. Load keywords from the specified file
-2. Search YouTube channels in the target region
-3. Apply region-specific filtering thresholds
-4. Extract and analyze keywords from successful videos
-5. Output results in the specified format
-
-### Output Formats
-
-#### Google Sheets Output
-
-| Column | Description |
-|--------|-------------|
-| Channel Name | YouTube channel name |
-| Channel URL | Direct link to channel |
-| Subscribers | Current subscriber count |
-| Video Count | Total videos published |
-| Created Date | Channel creation date |
-| Top Video 1-3 | Top 3 high-spread videos |
-| Spread Rate 1-3 | Spread rate for each video |
-| Search Keyword | Keyword that found this channel |
-| Personal Branding | Low/High (business suitability) |
-| Top Keywords | Extracted trending keywords |
-| Region | Target market region |
-| Update Time | Data collection timestamp |
-
-#### JSON Output
-- File: `rising_channels_{region}_{YYYYMMDD}.json`
-- Contains full channel data with metadata
-
-#### CSV Output
-- Channels: `rising_channels_{region}_{YYYYMMDD}.csv`
-- Keywords: `hot_keywords_{region}_{YYYYMMDD}.csv` (score ≥ 6)
-
-## 自動実行の設定
-
-### Linuxの場合（cron）
-
-```bash
-# crontabを編集
-crontab -e
-
-# 毎日午前9時に実行する例
-0 9 * * * cd /path/to/yt-channel-autolist && python main.py
-```
-
-### GitHub Actionsを使用する場合
-
-`.github/workflows/auto-run.yml`を作成：
+`.github/workflows/youtube-scraper.yml` を作成:
 
 ```yaml
-name: Auto Run YouTube Channel Scraper
+name: YouTube Channel Discovery
 
 on:
   schedule:
-    # 毎日UTC 0:00（JST 9:00）に実行
-    - cron: '0 0 * * *'
+    # 毎週月曜日 9:00 JST (0:00 UTC) に実行
+    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 jobs:
-  run-scraper:
+  discover-channels:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        region: [JP, US, EN, ES, PT, BR]
+    
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.11'
     
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Run scraper
+    - name: Run channel discovery for ${{ matrix.region }}
       env:
         YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
       run: |
-        python main.py
+        python main.py --region ${{ matrix.region }}
 ```
 
-## Configuration
+## 🧪 開発・テスト
 
-### Environment Variables
-
-Create a `.env` file based on `.env.example`:
+### 開発環境のセットアップ
 
 ```bash
-# API Keys
-YOUTUBE_API_KEY=your-youtube-api-key
-GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
+# 開発用依存関係のインストール
+pip install -r requirements-dev.txt  # 存在する場合
 
-# Region-specific thresholds (example for English market)
-EN_MIN_VOLUME=1000000
-EN_MAX_SUBS=50000
-EN_MAX_VIDEOS=30
-EN_SPREAD_RATE_MIN=2
-EN_SPREAD_RATE_MAX=6
-EN_CHANNEL_AGE_DAYS=60
+# コードフォーマッター（Black）のインストール
+pip install black
 
-# Optional keyword research APIs
-VIDIQ_API_KEY=your-vidiq-key
-TUBEBUDDY_API_KEY=your-tubebuddy-key
+# リンター（Flake8）のインストール
+pip install flake8
 ```
 
-### Region-Specific Defaults
+### テストの実行
 
-| Metric | JP | EN/US | ES | PT/BR |
-|--------|----|----|----|----|
-| Min Search Volume | 500k | 1M | 750k | 750k |
-| Max Subscribers | 20k | 50k | 40k | 40k |
-| Max Videos | 30 | 30 | 30 | 30 |
-| Spread Rate Range | 3-8× | 2-6× | 2.5-7× | 2.5-7× |
-| Channel Age | 60 days | 60 days | 60 days | 60 days |
+```bash
+# 単体テストの実行
+python -m pytest
 
-### 個人ブランディング判定のカスタマイズ
+# 特定機能のテスト
+python test_overseas_features.py
+python test_personal_branding.py
 
-`youtube_scraper.py`の`is_low_personal_branding`メソッドで判定キーワードを追加・削除できます：
-
-```python
-personal_keywords = [
-    'face', 'selfie', 'vlog', 'my', '私', 'personal', 
-    'daily', 'routine', 'lifestyle', 'diary', 
-    # 新しいキーワードを追加
-    'morning routine', 'night routine', 'grwm'
-]
+# カバレッジ付きテスト実行
+python -m pytest --cov=. --cov-report=html
 ```
 
-## トラブルシューティング
+### コーディング規約
 
-### よくあるエラーと解決方法
+- **フォーマッター**: Black（行長88文字）
+- **リンター**: Flake8
+- **型ヒント**: 可能な限り使用を推奨
+- **Docstring**: Google スタイル
 
-1. **APIキーエラー**
-   ```
-   Error: Invalid API key
-   ```
-   - 環境変数`YOUTUBE_API_KEY`が正しく設定されているか確認
-   - APIキーがYouTube Data API v3で有効になっているか確認
+```bash
+# コードフォーマット
+black .
 
-2. **Google認証エラー**
-   ```
-   Error: Could not authenticate with Google Sheets
-   ```
-   - `GOOGLE_SERVICE_ACCOUNT_JSON`が正しいJSON形式か確認
-   - サービスアカウントにGoogle Sheets APIへのアクセス権限があるか確認
+# リントチェック
+flake8 .
+```
 
-3. **キーワードファイルエラー**
-   ```
-   Error: keywords.txt not found
-   ```
-   - `keywords.txt`がプロジェクトルートに存在するか確認
+### ブランチ戦略
 
-4. **API制限エラー**
-   ```
-   Error: Quota exceeded
-   ```
-   - YouTube Data APIの日次クォータを確認（デフォルト: 10,000ユニット/日）
-   - 検索キーワード数を減らすか、実行頻度を調整
+- `main`: 本番環境用の安定版
+- `develop`: 開発用ブランチ
+- `feature/*`: 新機能開発
+- `bugfix/*`: バグ修正
+- `docs/*`: ドキュメント更新
 
-## 注意事項
+## 📁 プロジェクト構成
 
-- YouTube Data APIには使用制限があります（デフォルト: 10,000ユニット/日）
-- 大量のキーワードを処理する場合は、API使用量に注意してください
-- 個人情報保護の観点から、収集したデータの取り扱いには十分注意してください
+```
+yt-channel-autolist/
+├── README.md               # このファイル
+├── requirements.txt        # Python依存関係
+├── .env.example           # 環境変数テンプレート
+├── keywords.txt           # デフォルトキーワードリスト
+│
+├── main.py                # エントリーポイント
+├── config.py              # 設定管理
+├── youtube_scraper.py     # YouTube API連携とスクレイピング
+├── sheets_writer.py       # Google Sheets出力
+├── keyword_extractor.py   # キーワード分析
+├── keyword_research_api.py # 外部キーワードAPI連携
+│
+├── test_overseas_features.py  # 海外市場機能テスト
+├── test_personal_branding.py  # 個人ブランディング検出テスト
+│
+└── .github/
+    └── workflows/         # GitHub Actions設定
+```
 
-## ライセンス
+### 主要モジュールの説明
 
-このプロジェクトはMITライセンスの下で公開されています。
+- **main.py**: CLIインターフェースとメイン処理フロー
+- **config.py**: 地域別設定と環境変数管理
+- **youtube_scraper.py**: YouTube Data API呼び出しとチャンネルフィルタリング
+- **keyword_extractor.py**: NLTK使用のキーワード抽出と頻度分析
+- **sheets_writer.py**: Google Sheets APIを使用したデータ出力
 
-## 貢献
+## 🔧 トラブルシューティング
 
-プルリクエストは歓迎します。大きな変更を行う場合は、まずissueを作成して変更内容を説明してください。
+### よくある問題と解決方法
 
-## 作者
+#### 1. APIキーエラー
+```
+Error: Invalid API key
+```
+**解決方法**:
+- 環境変数 `YOUTUBE_API_KEY` が正しく設定されているか確認
+- APIキーがYouTube Data API v3で有効になっているか確認
+- APIキーの制限設定を確認
 
-[@Jun2664](https://github.com/Jun2664)
+#### 2. Google認証エラー
+```
+Error: Could not authenticate with Google Sheets
+```
+**解決方法**:
+- `GOOGLE_SERVICE_ACCOUNT_JSON` が正しいJSON形式か確認
+- サービスアカウントにGoogle Sheets APIアクセス権限があるか確認
+- Google Cloudプロジェクトで Sheets API が有効か確認
+
+#### 3. APIクォータ超過
+```
+Error: Quota exceeded
+```
+**解決方法**:
+- YouTube API の日次クォータを確認（デフォルト10,000ユニット）
+- キーワード数を減らすか、実行頻度を調整
+- 必要に応じてGoogle Cloudコンソールでクォータ増加をリクエスト
+
+#### 4. 依存関係エラー
+```
+ModuleNotFoundError: No module named 'xxx'
+```
+**解決方法**:
+```bash
+pip install -r requirements.txt --upgrade
+```
+
+### デバッグモード
+
+詳細なログ出力を有効にする:
+
+```bash
+# 環境変数でデバッグモードを有効化
+export DEBUG=true
+python main.py
+```
+
+## 🤝 コントリビューション
+
+プロジェクトへの貢献を歓迎します！
+
+### 貢献の方法
+
+1. このリポジトリをフォーク
+2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
+### 開発ガイドライン
+
+- コードは Black でフォーマット
+- テストを追加/更新
+- ドキュメントを更新
+- コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/) に従う
+
+### 報告・提案
+
+- **バグ報告**: [Issues](https://github.com/Jun2664/yt-channel-autolist/issues)
+- **機能提案**: [Discussions](https://github.com/Jun2664/yt-channel-autolist/discussions)
+- **セキュリティ問題**: メールで直接連絡
+
+## 📄 ライセンス
+
+このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+
+```
+MIT License
+
+Copyright (c) 2024 Jun2664
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+<div align="center">
+  <p>
+    <strong>開発者:</strong> <a href="https://github.com/Jun2664">@Jun2664</a>
+  </p>
+  <p>
+    <a href="https://github.com/Jun2664/yt-channel-autolist/issues">Issues</a> •
+    <a href="https://github.com/Jun2664/yt-channel-autolist/pulls">Pull Requests</a> •
+    <a href="https://github.com/Jun2664/yt-channel-autolist/discussions">Discussions</a>
+  </p>
+</div>
+
+<!-- Last updated: 2025-06-05 -->
