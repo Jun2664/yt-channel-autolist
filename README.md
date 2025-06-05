@@ -1,30 +1,33 @@
 # YouTube Channel Auto-List
 
-YouTubeの新興チャンネルを自動的に発見・フィルタリングし、Googleスプレッドシートに出力するPythonツールです。
+A Python tool that automatically discovers and filters emerging YouTube channels across multiple regions and exports them to Google Sheets, JSON, or CSV.
 
-## 概要
+## Overview
 
-このツールは、特定のキーワードに基づいてYouTubeチャンネルを検索し、成長ポテンシャルの高い新興チャンネルを自動的に発見します。個人ブランディングが低く、ビジネス提携の可能性が高いチャンネルを識別する機能も備えています。
+This tool searches for YouTube channels based on specific keywords and automatically discovers emerging channels with high growth potential. It features region-specific configurations, keyword analysis, and personal branding detection to identify channels suitable for business partnerships.
 
-## 主な機能
+## Key Features
 
-- **自動チャンネル検索**: キーワードに基づいてYouTubeチャンネルを自動検索
-- **スマートフィルタリング**: 
-  - 登録者数 ≤ 20,000人
-  - 動画数 ≤ 30本
-  - チャンネル開設から2ヶ月以内
-  - 拡散率3-8の動画を3本以上保有
-- **個人ブランディング判定**: 個人チャンネル/Vlogチャンネルを自動識別し、ビジネス向けチャンネルを優先
-- **拡散率計算**: 各動画の「再生回数/登録者数」を計算し、バイラル性を評価
-- **Googleスプレッドシート連携**: フィルタリング結果を自動的にスプレッドシートに出力
-- **バッチ処理**: 複数のキーワードを連続処理
+- **Multi-Region Support**: Search channels in JP, US, EN, ES, PT, BR markets
+- **Automatic Channel Discovery**: Search YouTube channels based on keywords
+- **Smart Filtering with Region-Specific Thresholds**: 
+  - Subscriber count limits (JP: ≤20k, EN: ≤50k, etc.)
+  - Video count ≤ 30
+  - Channel age within 60 days
+  - Multiple videos with optimal spread rates
+- **Keyword Analysis**: Extract and analyze trending keywords from successful videos
+- **Personal Branding Detection**: Automatically identify personal/vlog channels to prioritize business-suitable channels
+- **Spread Rate Calculation**: Calculate view/subscriber ratio to evaluate viral potential
+- **Multiple Output Formats**: Export to Google Sheets, JSON, or CSV
+- **Batch Processing**: Process multiple keywords continuously
+- **GitHub Actions Integration**: Automated weekly runs with region-specific processing
 
-## 前提条件
+## Prerequisites
 
-- Python 3.6以上
-- YouTube Data API v3のAPIキー
-- Google Cloud ServiceアカウントのJSON認証情報
-- 必要なPythonライブラリ（requirements.txtに記載）
+- Python 3.6+
+- YouTube Data API v3 API key
+- Google Cloud Service Account JSON credentials (for Sheets export)
+- Required Python libraries (see requirements.txt)
 
 ## セットアップ
 
@@ -84,38 +87,76 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ".
 - スキル系: "video editing", "3d modeling", "game development"
 - ビジネス系: "business", "finance", "marketing", "investing"
 
-## 使い方
+## Usage
 
-### 基本的な実行
+### Basic Usage (Japanese Market)
 
 ```bash
 python main.py
 ```
 
-実行すると、以下の処理が自動的に行われます：
+### Search English Market Channels
 
-1. `keywords.txt`から検索キーワードを読み込み
-2. 各キーワードでYouTubeチャンネルを検索（最大50件/キーワード）
-3. フィルタリング条件に基づいてチャンネルを選別
-4. 結果をGoogleスプレッドシートに出力
-5. スプレッドシートのURLを表示
+```bash
+python main.py --region US --lang en
+```
 
-### 出力形式
+### Export to Different Formats
 
-Googleスプレッドシートには以下の情報が出力されます：
+```bash
+# Export to JSON
+python main.py --region EN --output-format json
 
-| カラム | 説明 |
-|--------|------|
-| チャンネル名 | YouTubeチャンネルの名前 |
-| チャンネルURL | チャンネルへの直接リンク |
-| 登録者数 | 現在の登録者数 |
-| 動画数 | 投稿された動画の総数 |
-| チャンネル作成日 | チャンネルが開設された日付 |
-| トップ動画1-3 | 拡散率の高い上位3動画 |
-| 拡散率1-3 | 各動画の拡散率（再生回数/登録者数） |
-| 検索キーワード | このチャンネルを発見したキーワード |
-| 個人ブランディング | 「低」または「高」（DM可能性の指標） |
-| 更新日時 | データが取得された日時 |
+# Export to CSV
+python main.py --region ES --output-format csv
+
+# Use custom keywords file
+python main.py --region PT --keywords-file keywords_pt.txt
+```
+
+### Region Options
+
+- `JP` - Japan (default)
+- `US` - United States
+- `EN` - English-speaking markets
+- `ES` - Spanish-speaking markets
+- `PT` - Portuguese-speaking markets
+- `BR` - Brazil
+
+The tool will:
+
+1. Load keywords from the specified file
+2. Search YouTube channels in the target region
+3. Apply region-specific filtering thresholds
+4. Extract and analyze keywords from successful videos
+5. Output results in the specified format
+
+### Output Formats
+
+#### Google Sheets Output
+
+| Column | Description |
+|--------|-------------|
+| Channel Name | YouTube channel name |
+| Channel URL | Direct link to channel |
+| Subscribers | Current subscriber count |
+| Video Count | Total videos published |
+| Created Date | Channel creation date |
+| Top Video 1-3 | Top 3 high-spread videos |
+| Spread Rate 1-3 | Spread rate for each video |
+| Search Keyword | Keyword that found this channel |
+| Personal Branding | Low/High (business suitability) |
+| Top Keywords | Extracted trending keywords |
+| Region | Target market region |
+| Update Time | Data collection timestamp |
+
+#### JSON Output
+- File: `rising_channels_{region}_{YYYYMMDD}.json`
+- Contains full channel data with metadata
+
+#### CSV Output
+- Channels: `rising_channels_{region}_{YYYYMMDD}.csv`
+- Keywords: `hot_keywords_{region}_{YYYYMMDD}.csv` (score ≥ 6)
 
 ## 自動実行の設定
 
@@ -165,26 +206,39 @@ jobs:
         python main.py
 ```
 
-## 高度な設定
+## Configuration
 
-### フィルタリング条件のカスタマイズ
+### Environment Variables
 
-`youtube_scraper.py`の`filter_channels`メソッドで条件を調整できます：
+Create a `.env` file based on `.env.example`:
 
-```python
-# 登録者数の上限を変更
-if channel_info['subscriber_count'] > 50000:  # 20000から変更
-    continue
+```bash
+# API Keys
+YOUTUBE_API_KEY=your-youtube-api-key
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
 
-# チャンネル年齢の条件を変更
-channel_age_days = (datetime.now() - created_date).days
-if channel_age_days > 90:  # 60日から90日に変更
-    continue
+# Region-specific thresholds (example for English market)
+EN_MIN_VOLUME=1000000
+EN_MAX_SUBS=50000
+EN_MAX_VIDEOS=30
+EN_SPREAD_RATE_MIN=2
+EN_SPREAD_RATE_MAX=6
+EN_CHANNEL_AGE_DAYS=60
 
-# 拡散率の条件を変更
-if 2 <= rate <= 10:  # 3-8から2-10に変更
-    high_diffusion_videos.append(video)
+# Optional keyword research APIs
+VIDIQ_API_KEY=your-vidiq-key
+TUBEBUDDY_API_KEY=your-tubebuddy-key
 ```
+
+### Region-Specific Defaults
+
+| Metric | JP | EN/US | ES | PT/BR |
+|--------|----|----|----|----|
+| Min Search Volume | 500k | 1M | 750k | 750k |
+| Max Subscribers | 20k | 50k | 40k | 40k |
+| Max Videos | 30 | 30 | 30 | 30 |
+| Spread Rate Range | 3-8× | 2-6× | 2.5-7× | 2.5-7× |
+| Channel Age | 60 days | 60 days | 60 days | 60 days |
 
 ### 個人ブランディング判定のカスタマイズ
 
