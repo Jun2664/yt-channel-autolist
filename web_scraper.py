@@ -53,7 +53,17 @@ class YouTubeScraper:
         options.add_experimental_option('prefs', {'intl.accept_languages': 'en-US,en'})
         
         if self.scraper_config['use_undetected_driver']:
-            driver = uc.Chrome(options=options)
+            # Try to use Chrome with explicit version if available
+            try:
+                chrome_version = self.scraper_config.get('chrome_version')
+                if chrome_version:
+                    driver = uc.Chrome(options=options, version_main=int(chrome_version))
+                else:
+                    driver = uc.Chrome(options=options)
+            except Exception as e:
+                logger.warning(f"Failed to initialize undetected Chrome driver: {e}")
+                # Fallback to regular Chrome driver
+                driver = webdriver.Chrome(options=options)
         else:
             driver = webdriver.Chrome(options=options)
             
