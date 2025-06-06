@@ -1,6 +1,6 @@
 # YouTube Channel Auto-List (US/English Edition)
 
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B%20|%203.12-blue)](https://www.python.org/)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=github-actions)](https://github.com/Jun2664/yt-channel-autolist/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -38,10 +38,12 @@ YouTube Channel Auto-List is a Python tool that automatically discovers, analyze
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ (Python 3.12 is supported with setuptools>=68)
 - Chrome/Chromium browser
 - pip or Poetry for package management
 - Google Cloud account (for Sheets export only)
+
+**Note for Python 3.12 users**: Python 3.12 removed the `distutils` module from the standard library. This project includes `setuptools>=68` in requirements.txt which provides a compatibility layer for packages that still depend on `distutils` (like undetected-chromedriver 3.5.4).
 
 ### 1. Clone Repository
 

@@ -10,3 +10,4 @@ beautifulsoup4==4.12.2
 undetected-chromedriver==3.5.4
 langdetect==1.0.9
 fake-useragent==1.4.0
+setuptools>=68.0.0  # Required for Python 3.12 compatibility (provides distutils)
