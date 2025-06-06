@@ -58,5 +58,6 @@ class Config:
             'headless': bool(os.getenv('SCRAPER_HEADLESS', 'true').lower() == 'true'),
             'user_agent_rotation': bool(os.getenv('USER_AGENT_ROTATION', 'true').lower() == 'true'),
             'max_retries': int(os.getenv('MAX_RETRIES', 3)),
-            'timeout': int(os.getenv('PAGE_TIMEOUT', 30))
+            'timeout': int(os.getenv('PAGE_TIMEOUT', 30)),
+            'chrome_version': os.getenv('CHROME_VERSION', None)
         }
