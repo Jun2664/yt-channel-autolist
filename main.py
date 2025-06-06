@@ -10,20 +10,7 @@ from config import Config
 def parse_arguments():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description='YouTube Channel Auto-List - Discover rising YouTube channels'
-    )
-    parser.add_argument(
-        '--region',
-        type=str,
-        default=os.getenv('DEFAULT_REGION', 'JP'),
-        choices=['JP', 'US', 'EN', 'ES', 'PT', 'BR'],
-        help='Target region (default: JP)'
-    )
-    parser.add_argument(
-        '--lang',
-        type=str,
-        default=None,
-        help='Language code (default: auto-detected from region)'
+        description='YouTube Channel Auto-List - Discover rising YouTube channels (US/English only)'
     )
     parser.add_argument(
         '--keywords-file',
@@ -38,25 +25,31 @@ def parse_arguments():
         choices=['sheets', 'json', 'csv'],
         help='Output format (default: sheets)'
     )
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug logging'
+    )
     return parser.parse_args()
 
 def main():
     """Main process"""
     args = parse_arguments()
     
-    # Get configuration for the region
-    region_config = Config.get_region_config(args.region)
-    if args.lang:
-        region_config['language'] = args.lang
+    # Set up logging
+    import logging
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     
-    # Get API credentials
+    # Get configuration (fixed to US)
+    region_config = Config.get_region_config('US')
+    
+    # Get API credentials (only for keyword research)
     api_keys = Config.get_api_keys()
     service_account_json = Config.get_google_credentials()
     
-    if not api_keys['youtube']:
-        print("Error: YOUTUBE_API_KEY is not set")
-        sys.exit(1)
-        
     if args.output_format == 'sheets' and not service_account_json:
         print("Error: GOOGLE_SERVICE_ACCOUNT_JSON is not set")
         sys.exit(1)
@@ -69,40 +62,37 @@ def main():
         print(f"Error: Keywords file '{args.keywords_file}' not found")
         sys.exit(1)
     
-    print(f"Region: {args.region}")
+    print(f"Region: US (English-only)")
     print(f"Language: {region_config['language']}")
     print(f"Number of keywords: {len(keywords)}")
-    print(f"Configuration: {region_config}")
+    print(f"Configuration:")
+    print(f"  - Min subscribers: {region_config['min_subs']}")
+    print(f"  - Max subscribers: {region_config['max_subs']}")
+    print(f"  - Max videos: {region_config['max_videos']}")
+    print(f"  - Search limit: {region_config['search_limit']}")
     
-    # Initialize YouTube scraper with region config
+    # Initialize YouTube scraper (no API key needed)
     scraper = YouTubeScraper(
-        api_key=api_keys['youtube'],
-        region=args.region,
+        api_key=None,  # Not used anymore
+        region='US',
         config=region_config,
         api_keys=api_keys
     )
     
-    # Process keywords and filter channels
-    for keyword in keywords:
-        try:
-            scraper.process_keyword(keyword)
-        except Exception as e:
-            print(f"Error processing keyword '{keyword}': {e}")
-            continue
-    
-    # Get filtered channels
-    filtered_channels = scraper.get_filtered_channels()
+    # Analyze channels based on keywords
+    print("\nStarting web scraping (this may take several minutes)...")
+    filtered_channels = scraper.analyze_channels(keywords)
     print(f"\nChannels matching criteria: {len(filtered_channels)}")
     
     if filtered_channels:
-        # Generate output filename with region and date
+        # Generate output filename with date
         date_str = datetime.now().strftime('%Y%m%d')
         
         if args.output_format == 'sheets':
             # Write to Google Sheets
             try:
                 writer = SheetsWriter(service_account_json)
-                spreadsheet_name = f'YouTube Channels - {args.region} - {date_str}'
+                spreadsheet_name = f'YouTube Channels - US - {date_str}'
                 spreadsheet_url = writer.write_channels_data(
                     spreadsheet_name,
                     filtered_channels
@@ -115,7 +105,7 @@ def main():
         elif args.output_format == 'json':
             # Write to JSON file
             import json
-            filename = f'rising_channels_{args.region}_{date_str}.json'
+            filename = f'rising_channels_US_{date_str}.json'
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(filtered_channels, f, ensure_ascii=False, indent=2)
             print(f"\nData written to: {filename}")
@@ -123,7 +113,7 @@ def main():
         elif args.output_format == 'csv':
             # Write to CSV file
             import csv
-            filename = f'rising_channels_{args.region}_{date_str}.csv'
+            filename = f'rising_channels_US_{date_str}.csv'
             with open(filename, 'w', newline='', encoding='utf-8') as f:
                 if filtered_channels:
                     writer = csv.DictWriter(f, fieldnames=filtered_channels[0].keys())
@@ -132,8 +122,8 @@ def main():
             print(f"\nData written to: {filename}")
             
         # Also generate keyword analysis CSV
-        if scraper.keyword_metrics:
-            keyword_filename = f'hot_keywords_{args.region}_{date_str}.csv'
+        if hasattr(scraper, 'keyword_metrics') and scraper.keyword_metrics:
+            keyword_filename = f'hot_keywords_US_{date_str}.csv'
             import csv
             with open(keyword_filename, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=['keyword', 'search_volume', 'competition', 'score'])

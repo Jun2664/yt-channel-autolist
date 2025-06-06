@@ -2,25 +2,34 @@ import os
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+import logging
+
+from web_scraper import YouTubeScraper as WebScraper
 from channel_sources import ChannelSources
 from keyword_extractor import KeywordExtractor
 from keyword_research_api import KeywordResearchAPI
+from langdetect import detect, LangDetectException
+
+logger = logging.getLogger(__name__)
+
 
 class YouTubeScraper:
-    def __init__(self, api_key: str, region: str = 'JP', config: Dict = None, api_keys: Dict = None):
-        self.youtube = build('youtube', 'v3', developerKey=api_key)
-        self.region = region
+    """Main YouTube scraper that uses web scraping instead of API"""
+    
+    def __init__(self, api_key: str = None, region: str = 'US', config: Dict = None, api_keys: Dict = None):
+        """Initialize scraper (api_key parameter kept for compatibility but not used)"""
+        self.region = 'US'  # Fixed to US
         self.config = config or {}
         self.channels_data = []
         self.keyword_metrics = []
         
+        # Initialize web scraper
+        self.web_scraper = WebScraper()
+        
         # Initialize helper modules
-        self.channel_sources = ChannelSources(api_key)
         self.keyword_extractor = KeywordExtractor(self.config.get('language', 'en'))
         
-        # Initialize keyword research API
+        # Initialize keyword research API (still useful for keyword expansion)
         if api_keys:
             self.keyword_api = KeywordResearchAPI(
                 vidiq_key=api_keys.get('vidiq', ''),
@@ -29,116 +38,94 @@ class YouTubeScraper:
             )
         else:
             self.keyword_api = KeywordResearchAPI()
-        
+    
     def search_channels_by_keyword(self, keyword: str, max_results: int = 50) -> List[str]:
-        """Search channels by keyword"""
+        """Search channels by keyword using web scraping"""
         try:
-            # For overseas markets, use channel sources module
-            if self.region != 'JP':
-                # Get channels from multiple sources
-                channel_ids = set()
-                
-                # Search by keyword with date filter
-                rising_channels = self.channel_sources.search_rising_channels(
-                    [keyword], 
-                    self.region,
-                    datetime.now() - timedelta(days=self.config.get('channel_age_days', 60))
-                )
-                channel_ids.update(rising_channels)
-                
-                # Also get trending channels in the region
-                trending_channels = self.channel_sources.get_trending_channels(self.region)
-                channel_ids.update(trending_channels)
-                
-                return list(channel_ids)[:max_results]
-            else:
-                # Original Japanese implementation
-                search_response = self.youtube.search().list(
-                    q=keyword,
-                    type='channel',
-                    part='snippet',
-                    maxResults=max_results,
-                    order='date',
-                    regionCode=self.region
-                ).execute()
-                
-                channel_ids = [item['id']['channelId'] for item in search_response.get('items', [])]
-                return channel_ids
-        except HttpError as e:
-            error_content = json.loads(e.content.decode('utf-8'))
-            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
-            print(f"Error searching channels for keyword '{keyword}': {error_reason} - {e}")
+            # Use web scraper to search channels
+            channels = self.web_scraper.search_channels([keyword], max_results)
+            channel_ids = [channel['channelId'] for channel in channels]
+            
+            # Store channel data for later use
+            for channel in channels:
+                self.channels_data.append(channel)
+            
+            return channel_ids
+            
+        except Exception as e:
+            logger.error(f"Error searching channels for keyword '{keyword}': {str(e)}")
             return []
     
     def get_channel_details(self, channel_id: str) -> Optional[Dict]:
-        """Get channel details"""
+        """Get channel details using web scraping"""
         try:
-            channel_response = self.youtube.channels().list(
-                id=channel_id,
-                part='snippet,statistics,contentDetails'
-            ).execute()
+            # Check if we already have this channel's data from search
+            for channel in self.channels_data:
+                if channel.get('channelId') == channel_id:
+                    # Get additional details from channel page
+                    details = self.web_scraper.get_channel_details(channel_id)
+                    if details:
+                        channel.update(details)
+                    
+                    return {
+                        'id': channel_id,
+                        'title': channel.get('title', ''),
+                        'description': channel.get('description', ''),
+                        'publishedAt': details.get('publishedAt') if details else None,
+                        'thumbnails': {},  # Not available via scraping
+                        'subscriberCount': channel.get('subscriberCount', 0),
+                        'videoCount': details.get('videoCount', 0) if details else 0,
+                        'viewCount': details.get('viewCount', 0) if details else 0,
+                        'uploads_playlist_id': None,  # Not used in scraping
+                        'region': 'US',
+                        'language': 'en'
+                    }
             
-            if not channel_response.get('items'):
+            # If not found in cache, get details directly
+            channel = self.web_scraper.get_channel_details(channel_id)
+            if not channel:
                 return None
-                
-            channel = channel_response['items'][0]
+            
             return {
                 'id': channel_id,
-                'title': channel['snippet']['title'],
-                'description': channel['snippet'].get('description', ''),
-                'publishedAt': channel['snippet']['publishedAt'],
-                'thumbnails': channel['snippet']['thumbnails'],
-                'subscriberCount': int(channel['statistics'].get('subscriberCount', 0)),
-                'videoCount': int(channel['statistics'].get('videoCount', 0)),
-                'uploads_playlist_id': channel['contentDetails']['relatedPlaylists']['uploads'],
-                'region': self.region
+                'title': '',  # Would need to scrape channel page for this
+                'description': '',
+                'publishedAt': channel.get('publishedAt'),
+                'thumbnails': {},
+                'subscriberCount': 0,  # Would need to scrape channel page
+                'videoCount': channel.get('videoCount', 0),
+                'viewCount': channel.get('viewCount', 0),
+                'uploads_playlist_id': None,
+                'region': 'US',
+                'language': 'en'
             }
-        except HttpError as e:
-            error_content = json.loads(e.content.decode('utf-8'))
-            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
-            print(f"Error getting channel details for ID {channel_id}: {error_reason} - {e}")
+            
+        except Exception as e:
+            logger.error(f"Error getting channel details for ID {channel_id}: {str(e)}")
             return None
     
-    def get_channel_videos(self, playlist_id: str, max_results: int = 50) -> List[Dict]:
-        """Get channel video list"""
-        videos = []
+    def get_channel_videos(self, channel_id: str, max_results: int = 30) -> List[Dict]:
+        """Get channel videos using web scraping"""
         try:
-            playlist_response = self.youtube.playlistItems().list(
-                playlistId=playlist_id,
-                part='contentDetails',
-                maxResults=max_results
-            ).execute()
+            videos = self.web_scraper.get_channel_videos(channel_id, max_results)
             
-            video_ids = [item['contentDetails']['videoId'] for item in playlist_response.get('items', [])]
+            # Format videos to match expected structure
+            formatted_videos = []
+            for video in videos:
+                formatted_videos.append({
+                    'id': video.get('videoId', ''),
+                    'title': video.get('title', ''),
+                    'publishedAt': video.get('publishedAt', ''),
+                    'viewCount': video.get('viewCount', 0),
+                    'likeCount': 0,  # Not available via scraping
+                    'commentCount': 0,  # Not available via scraping
+                    'thumbnails': {}  # Not included in scraping
+                })
             
-            if video_ids:
-                videos_response = self.youtube.videos().list(
-                    id=','.join(video_ids),
-                    part='snippet,statistics'
-                ).execute()
-                
-                for video in videos_response.get('items', []):
-                    videos.append({
-                        'id': video['id'],
-                        'title': video['snippet']['title'],
-                        'publishedAt': video['snippet']['publishedAt'],
-                        'viewCount': int(video['statistics'].get('viewCount', 0)),
-                        'likeCount': int(video['statistics'].get('likeCount', 0)),
-                        'commentCount': int(video['statistics'].get('commentCount', 0)),
-                        'thumbnails': video['snippet']['thumbnails']
-                    })
+            return formatted_videos
             
-            return videos
-        except HttpError as e:
-            error_content = json.loads(e.content.decode('utf-8'))
-            error_reason = error_content.get('error', {}).get('errors', [{}])[0].get('reason', 'unknown')
-            
-            # Handle 404 errors gracefully - playlist not found
-            if e.resp.status == 404 or error_reason == 'playlistNotFound':
-                print(f"Playlist {playlist_id} not found (404) - channel may have no public uploads")
-                return []
-            
-            print(f"Error getting video list for playlist {playlist_id}: {error_reason} - {e}")
+        except Exception as e:
+            logger.error(f"Error getting videos for channel {channel_id}: {str(e)}")
             return []
     
     def calculate_diffusion_rate(self, view_count: int, subscriber_count: int) -> float:
@@ -148,45 +135,30 @@ class YouTubeScraper:
         return view_count / subscriber_count
     
     def check_personal_branding(self, channel_data: Dict, videos: List[Dict]) -> bool:
-        """Check personal branding (rule-based) - Returns True if low personal branding, False if high"""
+        """Check personal branding - Returns True if low personal branding (business-suitable)"""
         reasons = []
         score = 0
         
-        # Extended personal keyword list with region-specific terms
+        # Personal keywords for English content
         personal_keywords = [
             'face', 'selfie', 'man', 'woman', 'boy', 'girl', 'host', 'actor', 
-            'vlog', 'interview', 'my', 'me', 'personal', 'daily', 'routine', 
-            'life', 'grwm', 'day in my life'
+            'vlog', 'vlogger', 'interview', 'my', 'me', 'personal', 'daily', 
+            'routine', 'life', 'grwm', 'day in my life', 'morning routine',
+            'night routine', 'lifestyle', 'diary', 'journal'
         ]
         
-        # Add language-specific keywords
-        if self.config.get('language') == 'ja':
-            personal_keywords.extend(['私', '僕', '俺', '自分', 'わたし', 'ぼく', 'おれ'])
-        elif self.config.get('language') == 'es':
-            personal_keywords.extend(['yo', 'mi', 'mío', 'mía'])
-        elif self.config.get('language') == 'pt':
-            personal_keywords.extend(['eu', 'meu', 'minha'])
-        
-        channel_title = channel_data['title']
-        channel_description = channel_data.get('description', '')
+        channel_title = channel_data.get('title', '').lower()
+        channel_description = channel_data.get('description', '').lower()
         
         # Check channel name patterns
-        personal_patterns = {
-            'ja': ['の部屋', 'チャンネル', 'TV', 'ch', 'Ch', 'CH'],
-            'en': ['vlog', 'life', 'diary', 'personal'],
-            'es': ['vida', 'diario', 'personal'],
-            'pt': ['vida', 'diário', 'pessoal']
-        }
+        personal_patterns = ['vlog', 'life', 'diary', 'personal', 'lifestyle', 'daily']
         
-        lang = self.config.get('language', 'en')
-        patterns = personal_patterns.get(lang, personal_patterns['en'])
-        
-        if any(pattern in channel_title for pattern in patterns):
+        if any(pattern in channel_title for pattern in personal_patterns):
             score += 3
             reasons.append("Personal pattern in channel name")
         
         # Check channel name and description
-        channel_text = (channel_title + ' ' + channel_description).lower()
+        channel_text = f"{channel_title} {channel_description}"
         
         # Personal keyword check
         found_keywords = []
@@ -199,15 +171,8 @@ class YouTubeScraper:
             reasons.append(f"Keywords detected: {', '.join(found_keywords[:3])}")
         
         # Check first person pronouns in description
-        first_person_keywords = {
-            'ja': ['私', '僕', '俺', '自分', 'わたし', 'ぼく', 'おれ'],
-            'en': ['i', 'me', 'my', 'myself'],
-            'es': ['yo', 'mi', 'mío'],
-            'pt': ['eu', 'meu', 'minha']
-        }
-        
-        first_person = first_person_keywords.get(lang, first_person_keywords['en'])
-        first_person_count = sum(1 for word in first_person if word in channel_description.lower())
+        first_person_keywords = ['i', 'me', 'my', 'myself', "i'm", "i've", "i'll"]
+        first_person_count = sum(1 for word in first_person_keywords if word in channel_description)
         
         if first_person_count >= 3:
             score += 3
@@ -217,7 +182,7 @@ class YouTubeScraper:
             reasons.append("Contains first person")
         
         # Check video titles
-        video_titles = ' '.join([video['title'].lower() for video in videos[:10]])
+        video_titles = ' '.join([video.get('title', '').lower() for video in videos[:10]])
         video_keywords_found = []
         for keyword in personal_keywords:
             if keyword in video_titles:
@@ -227,133 +192,143 @@ class YouTubeScraper:
         if video_keywords_found:
             reasons.append(f"In video titles: {', '.join(set(video_keywords_found[:3]))}")
         
-        # Check for human thumbnails (estimated from titles)
-        human_thumbnail_keywords = ['face', 'selfie', 'vlog', 'reaction'] + (
-            ['顔', 'リアクション'] if lang == 'ja' else []
-        )
-        videos_with_humans = sum(1 for v in videos[:10] 
-                               if any(kw in v['title'].lower() for kw in human_thumbnail_keywords))
+        # Check for vlog-style content
+        vlog_indicators = ['vlog', 'day in', 'routine', 'grwm', 'lifestyle', 'diary']
+        videos_with_vlogs = sum(1 for v in videos[:10] 
+                              if any(kw in v.get('title', '').lower() for kw in vlog_indicators))
         
-        if videos_with_humans >= 8:  # 80% or more
+        if videos_with_vlogs >= 8:  # 80% or more
             score += 3
-            reasons.append("All videos likely have human thumbnails")
-        elif videos_with_humans >= 5:  # 50% or more
+            reasons.append("Mostly vlog-style content")
+        elif videos_with_vlogs >= 5:  # 50% or more
             score += 1
-            reasons.append("Half or more videos likely have human thumbnails")
+            reasons.append("Half or more vlog-style content")
         
         # Save judgment reasons
         channel_data['personal_branding_score'] = min(score, 10)
         channel_data['personal_branding_reasons'] = ' + '.join(reasons) if reasons else "No personal branding"
         
-        # Score of 3 or higher indicates high personal branding (return False)
+        # Score of 3 or higher indicates high personal branding (return False = not suitable)
         return score < 3
     
-    def filter_channel(self, channel_data: Dict, videos: List[Dict]) -> bool:
+    def filter_channels(self, channels: List[Dict]) -> List[Dict]:
         """Filter channels based on criteria"""
-        # Condition 1: Subscriber count within limit
-        if channel_data['subscriberCount'] > self.config.get('max_subs', 20000):
-            return False
-            
-        # Condition 2: Video count within limit
-        if channel_data['videoCount'] > self.config.get('max_videos', 30):
-            return False
-            
-        # Condition 3: Channel created within specified days
-        created_date = datetime.fromisoformat(channel_data['publishedAt'].replace('Z', '+00:00'))
-        age_limit = datetime.now(created_date.tzinfo) - timedelta(days=self.config.get('channel_age_days', 60))
-        if created_date < age_limit:
-            return False
-            
-        # Condition 4: Videos with spread rate within range
-        spread_min = self.config.get('spread_rate_min', 3)
-        spread_max = self.config.get('spread_rate_max', 8)
-        high_diffusion_videos = []
+        filtered = []
         
-        for video in videos:
-            diffusion_rate = self.calculate_diffusion_rate(
-                video['viewCount'], 
-                channel_data['subscriberCount']
-            )
-            if spread_min <= diffusion_rate <= spread_max:
-                high_diffusion_videos.append(video)
+        for channel in channels:
+            try:
+                # Basic criteria check
+                subs = channel.get('subscriberCount', 0)
+                videos = channel.get('videoCount', 0)
                 
-        if len(high_diffusion_videos) < 3:
-            return False
-            
-        # Condition 5: Low personal branding
-        is_low_personal = self.check_personal_branding(channel_data, videos)
-        if not is_low_personal:
-            return False
-            
-        # Save filtered channel data
-        channel_data['high_diffusion_videos'] = high_diffusion_videos[:3]
-        channel_data['is_personal'] = channel_data['personal_branding_score'] >= 3
-        
-        return True
-    
-    def extract_and_analyze_keywords(self, channel_data: Dict, videos: List[Dict]):
-        """Extract keywords from video titles and analyze them"""
-        if not videos:
-            return
-        
-        # Extract keywords from video titles
-        video_titles = [v['title'] for v in videos[:20]]  # Top 20 videos
-        keywords = self.keyword_extractor.extract_keywords_from_titles(video_titles)
-        
-        # Expand keywords with autosuggest
-        expanded_keywords = []
-        for keyword in keywords[:10]:  # Limit to avoid quota issues
-            suggestions = self.keyword_extractor.expand_with_autosuggest(
-                keyword, 
-                self.region, 
-                self.config.get('language', 'en')
-            )
-            expanded_keywords.extend(suggestions)
-        
-        # Get unique keywords
-        all_keywords = list(set(keywords + expanded_keywords))[:30]
-        
-        # Get metrics for keywords
-        keyword_metrics = self.keyword_api.get_bulk_metrics(
-            all_keywords,
-            self.region,
-            self.config.get('language', 'en')
-        )
-        
-        # Store high-scoring keywords
-        for metric in keyword_metrics:
-            if metric['score'] >= 6:  # Only keep high-scoring keywords
-                self.keyword_metrics.append(metric)
-        
-        # Add top keywords to channel data
-        channel_data['top_keywords'] = [m['keyword'] for m in sorted(
-            keyword_metrics, 
-            key=lambda x: x['score'], 
-            reverse=True
-        )[:5]]
-    
-    def process_keyword(self, keyword: str):
-        """Process each keyword"""
-        print(f"Searching with keyword '{keyword}'...")
-        channel_ids = self.search_channels_by_keyword(keyword)
-        
-        for channel_id in channel_ids:
-            channel_data = self.get_channel_details(channel_id)
-            if not channel_data:
+                # Check subscriber count
+                if subs < self.config.get('min_subs', 100):
+                    logger.info(f"Skipping {channel.get('title')}: Too few subscribers ({subs})")
+                    continue
+                    
+                if subs > self.config.get('max_subs', 50000):
+                    logger.info(f"Skipping {channel.get('title')}: Too many subscribers ({subs})")
+                    continue
+                
+                # Check video count
+                if videos > self.config.get('max_videos', 30):
+                    logger.info(f"Skipping {channel.get('title')}: Too many videos ({videos})")
+                    continue
+                
+                # Check language (English only)
+                title = channel.get('title', '')
+                description = channel.get('description', '')
+                combined_text = f"{title} {description}"
+                
+                if combined_text.strip():
+                    try:
+                        lang = detect(combined_text)
+                        if lang != 'en':
+                            logger.info(f"Skipping {title}: Non-English content detected ({lang})")
+                            continue
+                    except LangDetectException:
+                        # If detection fails, check for English characters
+                        english_chars = sum(1 for c in combined_text if ord(c) < 128)
+                        if english_chars / len(combined_text) < 0.8:
+                            logger.info(f"Skipping {title}: Low English character ratio")
+                            continue
+                
+                # Check diffusion rate if we have view data
+                if 'viewCount' in channel and subs > 0:
+                    diffusion_rate = self.calculate_diffusion_rate(channel['viewCount'], subs)
+                    
+                    if diffusion_rate < self.config.get('spread_rate_min', 2):
+                        logger.info(f"Skipping {title}: Low diffusion rate ({diffusion_rate:.1f})")
+                        continue
+                        
+                    if diffusion_rate > self.config.get('spread_rate_max', 6):
+                        logger.info(f"Skipping {title}: High diffusion rate ({diffusion_rate:.1f})")
+                        continue
+                    
+                    channel['diffusion_rate'] = diffusion_rate
+                
+                filtered.append(channel)
+                
+            except Exception as e:
+                logger.error(f"Error filtering channel: {str(e)}")
                 continue
-                
-            videos = self.get_channel_videos(channel_data['uploads_playlist_id'])
-            
-            if self.filter_channel(channel_data, videos):
-                channel_data['search_keyword'] = keyword
-                
-                # Extract and analyze keywords for overseas markets
-                if self.region != 'JP':
-                    self.extract_and_analyze_keywords(channel_data, videos)
-                
-                self.channels_data.append(channel_data)
-                print(f"  ✓ {channel_data['title']} matches criteria")
+        
+        return filtered
     
-    def get_filtered_channels(self) -> List[Dict]:
-        """Return filtered channel data"""
-        return self.channels_data
+    def analyze_channels(self, keywords: List[str]) -> List[Dict]:
+        """Analyze channels based on keywords"""
+        all_channels = []
+        
+        try:
+            # Search for channels
+            channels = self.web_scraper.search_channels(keywords, self.config.get('search_limit', 1000))
+            
+            # Filter channels
+            filtered_channels = self.filter_channels(channels)
+            
+            # Get additional details and videos for each channel
+            for channel in filtered_channels:
+                channel_id = channel.get('channelId')
+                
+                # Get channel videos
+                videos = self.get_channel_videos(channel_id)
+                
+                # Check personal branding
+                is_business_suitable = self.check_personal_branding(channel, videos)
+                
+                if not is_business_suitable:
+                    logger.info(f"Skipping {channel.get('title')}: High personal branding score")
+                    continue
+                
+                # Extract keywords from videos
+                if videos:
+                    video_titles = [v.get('title', '') for v in videos]
+                    extracted_keywords = self.keyword_extractor.extract_keywords(video_titles)
+                    channel['extracted_keywords'] = extracted_keywords
+                    
+                    # Get keyword metrics
+                    if extracted_keywords:
+                        keyword_data = self.keyword_api.get_keyword_data(extracted_keywords[:5])
+                        channel['keyword_metrics'] = keyword_data
+                
+                all_channels.append(channel)
+                
+                logger.info(f"Added channel: {channel.get('title')} ({len(all_channels)} total)")
+                
+                # Check if we have enough channels
+                if len(all_channels) >= 300:
+                    logger.info("Reached 300 channels, stopping search")
+                    break
+                    
+        except Exception as e:
+            logger.error(f"Error analyzing channels: {str(e)}")
+        finally:
+            # Close the web scraper
+            self.web_scraper.close()
+        
+        return all_channels
+    
+    def __del__(self):
+        """Cleanup when object is destroyed"""
+        if hasattr(self, 'web_scraper'):
+            self.web_scraper.close()
