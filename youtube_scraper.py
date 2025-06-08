@@ -310,6 +310,20 @@ class YouTubeScraper:
                     if extracted_keywords:
                         keyword_data = self.keyword_api.get_keyword_data(extracted_keywords[:5])
                         channel['keyword_metrics'] = keyword_data
+                    
+                        # Add high diffusion videos (top 3 by view count)
+                    sorted_videos = sorted(videos, key=lambda v: v.get('viewCount', 0), reverse=True)
+                    channel['high_diffusion_videos'] = sorted_videos[:3]
+                
+                # Ensure required fields are present
+                channel['search_keyword'] = keywords[0] if keywords else ''
+                channel['top_keywords'] = channel.get('extracted_keywords', [])[:5]
+                channel['is_personal'] = channel.get('personal_branding_score', 0) >= 3
+                channel['region'] = 'US'
+                
+                # Ensure we have either 'id' or 'channelId'
+                if 'channelId' in channel and 'id' not in channel:
+                    channel['id'] = channel['channelId']
                 
                 all_channels.append(channel)
                 

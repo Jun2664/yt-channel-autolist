@@ -30,48 +30,74 @@ class YouTubeScraper:
         self.driver = None
         self.ua = UserAgent()
         
-    def _get_driver(self):
-        """Initialize Chrome driver with anti-detection measures"""
-        options = webdriver.ChromeOptions()
+    def _get_driver(self, max_retries: int = 3):
+        """Initialize Chrome driver with anti-detection measures and retry logic"""
+        last_error = None
         
-        if self.scraper_config['headless']:
-            options.add_argument('--headless')
-            
-        # Anti-detection arguments
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-gpu')
-        options.add_argument(f'--window-size=1920,1080')
-        
-        # Random user agent
-        if self.scraper_config['user_agent_rotation']:
-            user_agent = self.ua.random
-            options.add_argument(f'user-agent={user_agent}')
-            
-        # Accept-Language header for US English
-        # Commented out due to undetected-chromedriver v3 compatibility issue
-        # options.add_experimental_option('prefs', {'intl.accept_languages': 'en-US,en'})
-        
-        if self.scraper_config['use_undetected_driver']:
-            # Try to use Chrome with explicit version if available
+        for attempt in range(max_retries):
             try:
-                chrome_version = self.scraper_config.get('chrome_version')
-                if chrome_version:
-                    driver = uc.Chrome(options=options, version_main=int(chrome_version), use_subprocess=True)
+                options = webdriver.ChromeOptions()
+                
+                if self.scraper_config['headless']:
+                    options.add_argument('--headless')
+                    
+                # Anti-detection arguments
+                options.add_argument('--disable-blink-features=AutomationControlled')
+                options.add_argument('--disable-dev-shm-usage')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--disable-gpu')
+                options.add_argument(f'--window-size=1920,1080')
+                
+                # Random user agent
+                if self.scraper_config['user_agent_rotation']:
+                    user_agent = self.ua.random
+                    options.add_argument(f'user-agent={user_agent}')
+                    
+                # Accept-Language header for US English
+                # Commented out due to undetected-chromedriver v3 compatibility issue
+                # options.add_experimental_option('prefs', {'intl.accept_languages': 'en-US,en'})
+                
+                driver = None
+                
+                if self.scraper_config['use_undetected_driver']:
+                    # Try to use Chrome with explicit version if available
+                    try:
+                        chrome_version = self.scraper_config.get('chrome_version')
+                        if chrome_version:
+                            driver = uc.Chrome(options=options, version_main=int(chrome_version), use_subprocess=True)
+                        else:
+                            driver = uc.Chrome(options=options, use_subprocess=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize undetected Chrome driver: {e}")
+                        # Fallback to regular Chrome driver
+                        driver = webdriver.Chrome(options=options)
                 else:
-                    driver = uc.Chrome(options=options, use_subprocess=True)
+                    driver = webdriver.Chrome(options=options)
+                    
+                # Execute script to remove webdriver property
+                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                
+                # Test the driver with a simple command
+                driver.execute_script("return 1")
+                
+                logger.info(f"Successfully initialized Chrome driver on attempt {attempt + 1}")
+                return driver
+                
             except Exception as e:
-                logger.warning(f"Failed to initialize undetected Chrome driver: {e}")
-                # Fallback to regular Chrome driver
-                driver = webdriver.Chrome(options=options)
-        else:
-            driver = webdriver.Chrome(options=options)
-            
-        # Execute script to remove webdriver property
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        
-        return driver
+                last_error = e
+                logger.warning(f"Failed to initialize Chrome driver (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                # Clean up any failed driver instance
+                if 'driver' in locals() and driver:
+                    try:
+                        driver.quit()
+                    except:
+                        pass
+                        
+                if attempt < max_retries - 1:
+                    time.sleep(2 * (attempt + 1))  # Progressive delay
+                    
+        raise Exception(f"Failed to initialize Chrome driver after {max_retries} attempts: {str(last_error)}")
     
     def _random_delay(self, min_seconds: float = 1, max_seconds: float = 3):
         """Add random delay to avoid detection"""
@@ -149,9 +175,11 @@ class YouTubeScraper:
     def search_channels(self, keywords: List[str], max_results: int = 100) -> List[Dict[str, Any]]:
         """Search for channels based on keywords"""
         channels = []
+        driver = None
         
         try:
-            self.driver = self._get_driver()
+            driver = self._get_driver()
+            self.driver = driver
             
             for keyword in keywords:
                 try:
@@ -159,8 +187,31 @@ class YouTubeScraper:
                     search_url = f"https://www.youtube.com/results?search_query={keyword}+channel&sp=EgIQAg%253D%253D&gl=US&hl=en"
                     
                     logger.info(f"Searching for keyword: {keyword}")
-                    self.driver.get(search_url)
-                    self._random_delay(2, 4)
+                    
+                    # Retry navigation if connection fails
+                    nav_retries = 3
+                    for nav_attempt in range(nav_retries):
+                        try:
+                            self.driver.get(search_url)
+                            self._random_delay(2, 4)
+                            break
+                        except Exception as nav_e:
+                            if nav_attempt < nav_retries - 1:
+                                logger.warning(f"Navigation failed, retrying: {nav_e}")
+                                time.sleep(2)
+                                # Check if driver is still alive
+                                try:
+                                    self.driver.execute_script("return 1")
+                                except:
+                                    logger.warning("Driver connection lost, reinitializing...")
+                                    if self.driver:
+                                        try:
+                                            self.driver.quit()
+                                        except:
+                                            pass
+                                    self.driver = self._get_driver()
+                            else:
+                                raise nav_e
                     
                     # Scroll to load more results
                     self._scroll_page(scrolls=10)
@@ -192,9 +243,16 @@ class YouTubeScraper:
                 # Delay between searches
                 self._random_delay(self.config['request_delay'], self.config['request_delay'] + 2)
                 
+        except Exception as e:
+            logger.error(f"Error during channel search: {str(e)}")
+            raise
         finally:
-            if self.driver:
-                self.driver.quit()
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            self.driver = None
                 
         return channels
         
@@ -311,8 +369,31 @@ class YouTubeScraper:
                 self.driver = self._get_driver()
                 
             videos_url = f"https://www.youtube.com/channel/{channel_id}/videos"
-            self.driver.get(videos_url)
-            self._random_delay(2, 4)
+            
+            # Retry navigation if connection fails
+            nav_retries = 3
+            for nav_attempt in range(nav_retries):
+                try:
+                    self.driver.get(videos_url)
+                    self._random_delay(2, 4)
+                    break
+                except Exception as nav_e:
+                    if nav_attempt < nav_retries - 1:
+                        logger.warning(f"Navigation to videos page failed, retrying: {nav_e}")
+                        time.sleep(2)
+                        # Check if driver is still alive
+                        try:
+                            self.driver.execute_script("return 1")
+                        except:
+                            logger.warning("Driver connection lost, reinitializing...")
+                            if self.driver:
+                                try:
+                                    self.driver.quit()
+                                except:
+                                    pass
+                            self.driver = self._get_driver()
+                    else:
+                        raise nav_e
             
             # Scroll to load more videos
             self._scroll_page(scrolls=3)
