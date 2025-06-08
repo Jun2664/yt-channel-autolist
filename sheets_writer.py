@@ -105,10 +105,10 @@ class SheetsWriter:
         for channel in channels_data:
             row = [
                 channel['title'],
-                f"https://www.youtube.com/channel/{channel['id']}",
+                f"https://www.youtube.com/channel/{channel.get('channelId', channel.get('id', ''))}",
                 channel['subscriberCount'],
                 channel['videoCount'],
-                channel['publishedAt'][:10],  # 日付部分のみ
+                channel.get('publishedAt', '')[:10] if channel.get('publishedAt') else '',  # 日付部分のみ
             ]
             
             # トップ3動画の情報を追加

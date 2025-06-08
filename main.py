@@ -99,7 +99,31 @@ def main():
                 )
                 print(f"\nData written to spreadsheet: {spreadsheet_url}")
             except Exception as e:
-                print(f"Error writing to spreadsheet: {e}")
+                error_msg = str(e)
+                logging.error(f"Error writing to spreadsheet: {error_msg}")
+                
+                # Provide helpful error messages
+                if "'id'" in error_msg:
+                    print("\nError: Failed to write channel data to spreadsheet.")
+                    print("This may be due to missing channel ID information.")
+                    print("Consider using --output-format json or csv as a workaround.")
+                elif "Drive API" in error_msg or "SERVICE_DISABLED" in error_msg:
+                    print("\nError: Google Drive API is not enabled.")
+                    print("Please enable it at: https://console.cloud.google.com/apis/library/drive.googleapis.com")
+                else:
+                    print(f"\nError writing to spreadsheet: {error_msg}")
+                
+                # Fallback to JSON output
+                print("\nAttempting to save data as JSON instead...")
+                try:
+                    import json
+                    fallback_filename = f'rising_channels_US_{date_str}_fallback.json'
+                    with open(fallback_filename, 'w', encoding='utf-8') as f:
+                        json.dump(filtered_channels, f, ensure_ascii=False, indent=2)
+                    print(f"Data saved to: {fallback_filename}")
+                except Exception as fallback_e:
+                    print(f"Failed to save fallback JSON: {fallback_e}")
+                    
                 sys.exit(1)
                 
         elif args.output_format == 'json':
